@@ -1,27 +1,35 @@
-module Lib where
-import Lib
-import System.IO()
 import Control.Monad()
-import Read.Text
-type TextEditor = (String {-LEFT_STRING-}, String{-RIGHT_STRING-}, String{-SELECT_LIST-}, String{-COPY_BUFFER-}, String{-PASTE_LIST-})
+import Text.Read()
+type TextEditor = (String {-LEFT_STRING-}, String{-RIGHT_STRING-}, String{-SELECT_LIST-}, String{-COPY_BUFFER-})
 
+{-TEST COMMANDS
+sen = createTextEditor
+str = inputString sen "Hello my name is Doppio"
+movePrev = moveToPrevWordStart str
+movePrevAgain = moveToPrevWordStart movePrev
+deleteLetter = delete movePrevAgain
+-}
 
 
 -- FUNCTION DECLARATIONS
-{-NOTE: Functions main, saveFile, and loadFile don't need a function declaration because of import System.IO() at the top of the document-}
-createTextEditor::TextEditor
-setCursor::TextEditor->IO()
+create::TextEditor
+display::TextEditor->IO()
+save::TextEditor->IO()
+load::IO()
 
-inputString::TextEditor->String->TextEditor
+input::TextEditor->String->TextEditor
+copy::TextEditor->TextEditor
+paste::TextEditor->TextEditor->TextEditor
+delete::TextEditor->TextEditor
+backspace::TextEditor->TextEditor
+
 
 moveLeft::TextEditor->TextEditor
 moveRight::TextEditor->TextEditor
-moveToSenStart::TextEditor->TextEditor
-moveToSenEnd::TextEditor->TextEditor
-moveToNextWordStart::TextEditor->TextEditor
-moveToNextWordEnd::TextEditor->TextEditor
-moveToPrevWordStart::TextEditor->TextEditor 
-moveToPrevWordEnd::TextEditor->TextEditor
+moveSenStart::TextEditor->TextEditor
+moveSenEnd::TextEditor->TextEditor
+moveNextWord::TextEditor->TextEditor
+movePrevWord::TextEditor->TextEditor 
 
 selectAllRight::TextEditor->TextEditor
 selectAllLeft::TextEditor->TextEditor
@@ -31,80 +39,80 @@ selectNextWord::TextEditor->TextEditor
 selectPrevWord::TextEditor->TextEditor
 
 -- MISC FUNCTIONS
-main = do
-    contents <- readFile "test.txt"
-    putStrLn contents
+create = ("","","","")
 
-createTextEditor = ("","","","","")
+display(leftString, rightString, _, _) = putStrLn (leftString ++ "|" ++ rightString)
 
-setCursor(leftString, rightString, _, _, _) = putStrLn (leftString ++ "|" ++ rightString)
-
-saveFile = do
+save(leftString, rightString, _, _) = do
     putStrLn "Type file to output text"
     file <- getLine
-    writeFile file (show createTextEditor)
+    writeFile file (leftString++rightString)
     putStrLn "File saved" 
 
-loadFile = do 
+load = do 
     putStrLn "Type file to open"
     file <- getLine
-    let errCheck =  readMaybe 
     contents <- readFile file
-    putStrLn contents
+    let x = input create contents
+    print x
+
+copy (_, _, select, copyBuffer) = ("","","",[]++select)
+
+paste (_, _, _, copyBuffer) (leftString, rightString, _, _) = (leftString ++ copyBuffer, rightString, "", "")
+
+delete (leftString, rightString, _, _) = (leftString, drop 1 rightString, "", "")
+
+backspace (leftString, rightString, _, _) = ((init leftString), rightString, "", "")
 
 -- INPUT FUNCTION
-inputString (leftString, rightString, _, _, _) input = (leftString ++ input, rightString, "", "", "")
+input (leftString, rightString, _, _) input = (leftString ++ input, rightString, "", "")
 
 -- MOVE FUNCTIONS	
-moveLeft (leftString, rightString, _, _, _) = ((init leftString), (last leftString):rightString, "","","")
+moveLeft (leftString, rightString, [], _) = ((init leftString), (last leftString):rightString, "","")
 
-moveRight (leftString, rightString, _, _, _) = (leftString ++ [head rightString], tail rightString, "","","")
+moveRight (leftString, rightString, [], _) = (leftString ++ [head rightString], tail rightString, "","")
 
-moveToSenStart (leftString, rightString, _, _, _)
-    | leftString == [] = (leftString, rightString, "","","")
-    | otherwise = moveToSenStart (moveLeft (leftString, rightString, "","",""))
+moveNextWord (leftString, rightString, _, _) = search(moveRight(leftString, rightString,"","")) where 
+    search (leftString, rightString, _, _)
+     | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, "","")
+     | rightString == [] = (leftString, rightString, "","")
+     | otherwise = search(moveRight(leftString, rightString, "",""))
 
-moveToSenEnd (leftString, rightString, _, _, _)
-    | rightString == [] = (leftString, rightString, "","","")
-    | otherwise = moveToSenEnd (moveRight (leftString, rightString, "","",""))
+movePrevWord (leftString, rightString, _, _) = search(moveLeft(leftString, rightString, "","")) where 
+    search(leftString, rightString, _, _)
+     | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, "","")
+     | leftString == [] = (leftString, rightString, "","")
+     | otherwise = search(moveLeft(leftString, rightString, "",""))
 
-moveToNextWordStart (leftString, rightString, _, _, _) = searchNextWordStart(moveRight(leftString, rightString,"","","")) where 
-     searchNextWordStart (leftString, rightString, _, _, _)
-      | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, "","","")
-      | otherwise = searchNextWordStart(moveRight(leftString, rightString, "","",""))
+moveSenStart (leftString, rightString, _, _)
+    | leftString == [] = (leftString, rightString, "","")
+    | otherwise = moveSenStart (moveLeft (leftString, rightString, "",""))
 
-moveToNextWordEnd (leftString, rightString, _, _, _) = searchNextWordEnd(moveRight(leftString, rightString, "","","")) where 
-     searchNextWordEnd (leftString, rightString, _, _, _)
-      | (([last leftString]) /= " " && ([head rightString]) == " ") = (leftString, rightString, "","","")
-      | otherwise = searchNextWordEnd(moveRight(leftString, rightString, "","",""))
-
-moveToPrevWordStart (leftString, rightString, _, _, _) = searchPrevWordStart(moveLeft(leftString, rightString, "","","")) where 
-     searchPrevWordStart (leftString, rightString, _, _, _)
-      | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, "","","")
-      | otherwise = searchPrevWordStart(moveLeft(leftString, rightString, "","",""))
-
-moveToPrevWordEnd (leftString, rightString, _, _, _) = searchPrevWordEnd(moveLeft(leftString, rightString, "","","")) where 
-     searchPrevWordEnd (leftString, rightString, _, _, _)
-      | (([last leftString]) /= " " && ([head rightString]) == " ") = (leftString, rightString, "","","")
-      | otherwise = searchPrevWordEnd (moveLeft(leftString, rightString, "", "", ""))
+moveSenEnd (leftString, rightString, _, _)
+    | rightString == [] = (leftString, rightString, "","")
+    | otherwise = moveSenEnd (moveRight (leftString, rightString, "",""))
 
 -- SELECT FUNCTIONS
-selectAllRight (_, rightString, _, _, _) = ("", "", rightString, "", "")
+selectNextChar (leftString, rightString, select, _) = (leftString ++ [head rightString], tail rightString, select ++ [head rightString], "")
 
-selectAllLeft (leftString, _, _, _, _) = ("", "", leftString, "", "")
+selectPrevChar (leftString, rightString, select, _) = ((init leftString), (last leftString):rightString, (last leftString):select, "")
 
-selectNextChar (leftString, rightString, select, _, _) = (leftString ++ [head rightString], tail rightString, select ++ [head rightString], "", "")
+selectNextWord (leftString, rightString, select, _) = search(leftString ++ [head rightString], tail rightString, select ++ [head rightString], "") where 
+    search(leftString, rightString, select, "")
+      | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, select, "")
+      | (rightString == []) = (leftString, rightString, select,"")
+      | otherwise = search(leftString ++ [head rightString], tail rightString, select ++ [head rightString], "")
 
-selectPrevChar (leftString, rightString, select, _, _) = ((init leftString), (last leftString):rightString, (last leftString):select, "", "")
+selectPrevWord (leftString, rightString, select, _) = search((init leftString), (last leftString):rightString, (last leftString):select, "") where 
+    search(leftString, rightString, select, "")
+      | (([last leftString]) == " " && ([head rightString]) /= " ") = (leftString, rightString, select, "")
+      | (leftString == []) = (leftString, rightString, select,"")
+      | otherwise = search((init leftString), (last leftString):rightString, (last leftString):select, "")
 
-selectNextWord (leftString, rightString, select, _, _) = searchNextWordStart(selectNextChar(leftString, rightString, select, "", "")) where 
-     searchNextWordStart(leftString, rightString, select, "", "")
-      | (([last leftString]) == " " && ([head rightString]) /= " ") = ("", "", select, "", "")
-      | (rightString == []) = ("","",select,"", "")
-      | otherwise = searchNextWordStart(selectNextChar(leftString, rightString, select, "", ""))
+selectAllRight (leftString, rightString, select, _) 
+    | rightString == [] = (leftString, rightString, select, "")
+    | otherwise = selectAllRight (selectNextChar(leftString, rightString, select, ""))
 
-selectPrevWord (leftString, rightString, select, _, _) = searchPrevWordStart(selectPrevChar(leftString, rightString, select, "", "")) where 
-     searchPrevWordStart(leftString, rightString, select, "", "")
-      | (([last leftString]) == " " && ([head rightString]) /= " ") = ("", "", select, "", "")
-      | (leftString == []) = ("","",select,"", "")
-      | otherwise = searchPrevWordStart(selectPrevChar(leftString, rightString, select, "", ""))
+selectAllLeft (leftString, rightString, select, _)
+    | leftString == [] = (leftString, rightString, select, "")
+    | otherwise = selectAllLeft (selectPrevChar(leftString, rightString, select, ""))
